@@ -21,11 +21,17 @@ public class IpLog {
     @Column(name = "ip")
     private String ip;
 
-    @Column(name = "query_time")
-    private LocalDateTime queryTime;
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
 
     @Column(name = "city")
     private String city;
+
+    @Column(name = "query_time")
+    private LocalDateTime queryTime;
 
     @Override
     public boolean equals(Object o) {
@@ -39,4 +45,6 @@ public class IpLog {
     public int hashCode() {
         return getClass().hashCode();
     }
+
+
 }

@@ -40,6 +40,14 @@ public class WeatherService {
         log.info("Getting weather data for ip");
         RestTemplate restTemplate = new RestTemplate();
         String url = Objects.equals(ip, "0:0:0:0:0:0:0:1") ? "http://ip-api.com/json/" : "http://ip-api.com/json/" + ip;
+
+        if (ipLogRepository.existsByIp(ip)) {
+            IpLog ipLog = ipLogRepository.findByIp(ip);
+            if (ipLog.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(10))) {
+                return getWeatherByCoordinates(ipLog.getLatitude(), ipLog.getLongitude());
+            }
+        }
+
         ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
         if (responseEntity.getBody() == null) {
             return new JSONObject()
@@ -54,6 +62,8 @@ public class WeatherService {
         ipLog.setIp(ip);
         ipLog.setQueryTime(LocalDateTime.now());
         ipLog.setCity(jsonObject.getString("city"));
+        ipLog.setLatitude(lat);
+        ipLog.setLongitude(lon);
 
         ipLogRepository.save(ipLog);
         return getWeatherByCoordinates(lat, lon);
