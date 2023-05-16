@@ -1,6 +1,8 @@
 package io.karlis.weatherapp.services;
 
+import io.karlis.weatherapp.entities.IpLog;
 import io.karlis.weatherapp.entities.WeatherData;
+import io.karlis.weatherapp.repositories.IpLogRepository;
 import io.karlis.weatherapp.repositories.WeatherRepository;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -22,12 +24,14 @@ import java.util.Objects;
 
 public class WeatherService {
 
-    final WeatherRepository repository;
+    final WeatherRepository weatherRepository;
+    final IpLogRepository ipLogRepository;
     @Value("${API_KEY}")
     private String API_KEY;
 
-    public WeatherService(WeatherRepository repository) {
-        this.repository = repository;
+    public WeatherService(WeatherRepository weatherRepository, IpLogRepository ipLogRepository) {
+        this.ipLogRepository = ipLogRepository;
+        this.weatherRepository = weatherRepository;
     }
 
     @SneakyThrows
@@ -45,6 +49,13 @@ public class WeatherService {
         JSONObject jsonObject = new JSONObject(responseEntity.getBody());
         Double lat = jsonObject.getDouble("lat");
         Double lon = jsonObject.getDouble("lon");
+
+        IpLog ipLog = new IpLog();
+        ipLog.setIp(ip);
+        ipLog.setQueryTime(LocalDateTime.now());
+        ipLog.setCity(jsonObject.getString("city"));
+
+        ipLogRepository.save(ipLog);
         return getWeatherByCoordinates(lat, lon);
     }
 
@@ -52,8 +63,8 @@ public class WeatherService {
     private JSONObject getWeatherByCoordinates(Double lat, Double lon) {
         log.info("Getting weather data for city");
         String WEATHER_LINK = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={API_KEY}";
-        if (repository.existsByLatitudeAndLongitude(lat, lon)) {
-            WeatherData weatherData = repository.findByLatitudeAndLongitude(lat, lon);
+        if (weatherRepository.existsByLatitudeAndLongitude(lat, lon)) {
+            WeatherData weatherData = weatherRepository.findByLatitudeAndLongitude(lat, lon);
             if (weatherData.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(15))) {
                 log.info("Weather data is returned from repository");
                 return new JSONObject(weatherData);
@@ -104,7 +115,7 @@ public class WeatherService {
         weatherData.setWindSpeed(windSpeed);
         weatherData.setWeatherCondition(weatherDescription);
         weatherData.setQueryTime(queryTime);
-        repository.save(weatherData);
+        weatherRepository.save(weatherData);
         return weatherData;
     }
 
