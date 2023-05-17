@@ -17,13 +17,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureWebMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
-
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Objects;
-
 import static org.mockito.Mockito.when;
-
 
 @SpringBootTest
 @AutoConfigureWebMvc
@@ -76,18 +73,21 @@ public class WeatherApplicationTests {
         weatherData.setWeatherCondition("Clear");
         weatherData.setQueryTime(LocalDateTime.now());
 
-		when(weatherRepository.save(Mockito.any(WeatherData.class))).thenReturn(weatherData);
-        when(ipLogRepository.save(Mockito.any(IpLog.class))).thenReturn(ipLog);
+        when(weatherRepository.save(weatherData)).thenReturn(weatherData);
+        when(ipLogRepository.save(ipLog)).thenReturn(ipLog);
 
         String ip = "0:0:0:0:0:0:0:1";
 
-        when(ipLogRepository.existsByIp(Mockito.anyString())).thenReturn(false);
-		when(weatherRepository.existsByLatitudeAndLongitude(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(false);
+        when(ipLogRepository.existsByIp(ip)).thenReturn(false);
+        when(weatherRepository.existsByLatitudeAndLongitude(0.0, 0.0)).thenReturn(false);
         when(ipLogRepository.findAll()).thenReturn(Collections.singletonList(ipLog));
-		when(weatherRepository.findAll()).thenReturn(Collections.singletonList(weatherData));
+        when(weatherRepository.findAll()).thenReturn(Collections.singletonList(weatherData));
 
         this.service.getWeather(ip);
+        System.out.println(ipLogRepository.findAll().stream().toList().get(0).toString());
+        System.out.println(weatherRepository.findAll().stream().toList().get(0).toString());
+
         Assertions.assertTrue(ipLogRepository.findAll().size() > 0);
-		Assertions.assertTrue(weatherRepository.findAll().size() > 0);
+        Assertions.assertTrue(weatherRepository.findAll().size() > 0);
     }
 }

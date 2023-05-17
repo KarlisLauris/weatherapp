@@ -10,23 +10,23 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Service
 @Slf4j
-
 public class WeatherService {
-
-    final static int CACHE_DURATION = 15;
-    final WeatherRepository weatherRepository;
-    final IpLogRepository ipLogRepository;
+    private final static int CACHE_DURATION = 15;
+    private final String IP_API = "http://ip-api.com/json/";
+    private final String WEATHER_LINK = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={API_KEY}";
+    private final WeatherRepository weatherRepository;
+    private final IpLogRepository ipLogRepository;
     private final Cache<String, JSONObject> weatherCache;
     @Value("${API_KEY}")
     private String API_KEY;
@@ -40,12 +40,15 @@ public class WeatherService {
 
     @SneakyThrows
     public JSONObject getWeather(String ip) {
+        if (ip == null) {
+            return new JSONObject().put("error", "IP is null").put("status", HttpStatus.BAD_REQUEST);
+        }
         if (this.weatherCache.getIfPresent(ip) != null) {
             return this.weatherCache.getIfPresent(ip);
         }
         log.info("Getting weather data for ip");
         RestTemplate restTemplate = new RestTemplate();
-        String url = Objects.equals(ip, "0:0:0:0:0:0:0:1") ? "http://ip-api.com/json/" : "http://ip-api.com/json/" + ip;
+        String url = Objects.equals(ip, "0:0:0:0:0:0:0:1") ? IP_API : IP_API + ip;
 
         ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
         if (!responseEntity.hasBody()) {
@@ -74,8 +77,6 @@ public class WeatherService {
     @SneakyThrows
     private JSONObject getWeatherByCoordinates(Double lat, Double lon) {
         log.info("Getting weather data for city");
-        String WEATHER_LINK = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={API_KEY}";
-
         if (weatherRepository.existsByLatitudeAndLongitude(lat, lon)) {
             WeatherData weatherData = weatherRepository.findByLatitudeAndLongitude(lat, lon);
             if (weatherData.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(CACHE_DURATION))) {
