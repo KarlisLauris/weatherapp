@@ -2,9 +2,9 @@ package io.karlis.weatherapp.controllers;
 
 import io.karlis.weatherapp.services.WeatherService;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +22,6 @@ public class WeatherController {
         this.service = service;
     }
 
-
     private static String getIp(HttpServletRequest request) {
         String remoteAddr = "";
 
@@ -36,11 +35,11 @@ public class WeatherController {
         return remoteAddr;
     }
 
-    @GetMapping()
-    @SneakyThrows
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> getWeather(HttpServletRequest request) {
         String ip = getIp(request);
         JSONObject weather = service.getWeather(ip);
         return ResponseEntity.ok(weather.toString(1));
     }
+
 }

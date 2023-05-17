@@ -1,7 +1,9 @@
 package io.karlis.weatherapp.entities;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.hibernate.Hibernate;
 
 import java.time.LocalDateTime;
@@ -10,7 +12,6 @@ import java.util.Objects;
 @Entity
 @Getter
 @Setter
-@ToString
 @RequiredArgsConstructor
 @Table(name = "weather_data")
 public class WeatherData {
@@ -49,10 +50,5 @@ public class WeatherData {
         if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
         WeatherData that = (WeatherData) o;
         return getId() != null && Objects.equals(getId(), that.getId());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 }

@@ -1,17 +1,14 @@
 package io.karlis.weatherapp.entities;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.Hibernate;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 @Entity
 @Table(name = "ip_log")
-@Getter
 @Setter
-@ToString
 @RequiredArgsConstructor
 public class IpLog {
     @Id
@@ -32,19 +29,5 @@ public class IpLog {
 
     @Column(name = "query_time")
     private LocalDateTime queryTime;
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
-        IpLog ipLog = (IpLog) o;
-        return getId() != null && Objects.equals(getId(), ipLog.getId());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
-    }
-
 
 }

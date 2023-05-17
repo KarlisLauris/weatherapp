@@ -1,5 +1,7 @@
 package io.karlis.weatherapp.services;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.karlis.weatherapp.entities.IpLog;
 import io.karlis.weatherapp.entities.WeatherData;
 import io.karlis.weatherapp.repositories.IpLogRepository;
@@ -8,14 +10,12 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -24,37 +24,37 @@ import java.util.Objects;
 
 public class WeatherService {
 
+    final static int CACHE_DURATION = 15;
     final WeatherRepository weatherRepository;
     final IpLogRepository ipLogRepository;
+    private final Cache<String, JSONObject> weatherCache;
     @Value("${API_KEY}")
     private String API_KEY;
 
     public WeatherService(WeatherRepository weatherRepository, IpLogRepository ipLogRepository) {
         this.ipLogRepository = ipLogRepository;
         this.weatherRepository = weatherRepository;
+        this.weatherCache = Caffeine.newBuilder().expireAfterWrite(Duration.ofMinutes(CACHE_DURATION)).initialCapacity(50).build();
+
     }
 
     @SneakyThrows
-    @Cacheable(value = "weather", key = "#ip")
     public JSONObject getWeather(String ip) {
+        if (this.weatherCache.getIfPresent(ip) != null) {
+            return this.weatherCache.getIfPresent(ip);
+        }
         log.info("Getting weather data for ip");
         RestTemplate restTemplate = new RestTemplate();
         String url = Objects.equals(ip, "0:0:0:0:0:0:0:1") ? "http://ip-api.com/json/" : "http://ip-api.com/json/" + ip;
 
-        if (ipLogRepository.existsByIp(ip)) {
-            IpLog ipLog = ipLogRepository.findByIp(ip);
-            if (ipLog.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(10))) {
-                return getWeatherByCoordinates(ipLog.getLatitude(), ipLog.getLongitude());
-            }
-        }
-
         ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
-        if (responseEntity.getBody() == null) {
-            return new JSONObject()
-                    .put("error", "Response is null from ip-api.com API")
-                    .put("status", responseEntity.getStatusCode());
+        if (!responseEntity.hasBody()) {
+            return new JSONObject().put("error", "Response is null from ip-api.com API").put("status", responseEntity.getStatusCode());
         }
         JSONObject jsonObject = new JSONObject(responseEntity.getBody());
+        if (!jsonObject.toMap().containsKey("lat")) {
+            return new JSONObject().put("error", "Response returned from ip-api.com API does not contain lat and lon fields").put("status", responseEntity.getStatusCode());
+        }
         Double lat = jsonObject.getDouble("lat");
         Double lon = jsonObject.getDouble("lon");
 
@@ -66,17 +66,19 @@ public class WeatherService {
         ipLog.setLongitude(lon);
 
         ipLogRepository.save(ipLog);
-        return getWeatherByCoordinates(lat, lon);
+        JSONObject weatherData = getWeatherByCoordinates(lat, lon);
+        weatherCache.put(ip, weatherData);
+        return weatherData;
     }
 
     @SneakyThrows
     private JSONObject getWeatherByCoordinates(Double lat, Double lon) {
         log.info("Getting weather data for city");
         String WEATHER_LINK = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={API_KEY}";
+
         if (weatherRepository.existsByLatitudeAndLongitude(lat, lon)) {
             WeatherData weatherData = weatherRepository.findByLatitudeAndLongitude(lat, lon);
-            if (weatherData.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(15))) {
-                log.info("Weather data is returned from repository");
+            if (weatherData.getQueryTime().isAfter(LocalDateTime.now().minusMinutes(CACHE_DURATION))) {
                 return new JSONObject(weatherData);
             }
         }
@@ -99,9 +101,6 @@ public class WeatherService {
             return errorObject;
         }
     }
-
-
-
 
     private WeatherData saveWeatherDataFromResponse(String response) {
         JSONObject jsonObject = new JSONObject(response);
@@ -129,11 +128,11 @@ public class WeatherService {
         return weatherData;
     }
 
-
-    @CacheEvict(value = "weather", allEntries = true)
-    @Scheduled(fixedRate = 900000)
-    public void clearCache() {
-        log.info("Clearing cache");
+    public long getCacheSize() {
+        return weatherCache.estimatedSize();
     }
 
+    public void clearCache() {
+        weatherCache.invalidateAll();
+    }
 }
